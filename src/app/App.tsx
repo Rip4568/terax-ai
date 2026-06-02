@@ -1158,6 +1158,18 @@ export default function App() {
         // is the always-on toggle and is never claimed by the terminal.
         return inTerminal && !e.shiftKey;
       }
+      // Ctrl+D (EOF/exit), Ctrl+R (reverse history search), Ctrl+W (delete
+      // previous word) are critical readline/shell shortcuts that must reach the
+      // PTY when the terminal is focused instead of triggering app actions.
+      if (
+        id === "pane.splitRight" ||
+        id === "tab.newPrivate" ||
+        id === "tab.close"
+      ) {
+        const target =
+          (e.target as HTMLElement | null) ?? document.activeElement;
+        return !!(target as HTMLElement | null)?.closest?.(".xterm");
+      }
       return false;
     },
     [activeTab],
