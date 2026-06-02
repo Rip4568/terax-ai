@@ -18,6 +18,7 @@ import {
 import { fileIconUrl, folderIconUrl } from "./lib/iconResolver";
 import { COMPACT_CONTENT, COMPACT_ITEM } from "./lib/menuItemClass";
 import type { useFileTree } from "./lib/useFileTree";
+import type { GitDecorationKind } from "./lib/useExplorerGitStatus";
 
 type Tree = ReturnType<typeof useFileTree>;
 
@@ -31,6 +32,7 @@ export type EntryRowProps = {
   tree: Tree;
   isSelected: boolean;
   isRenaming: boolean;
+  gitDecoration?: GitDecorationKind;
   onOpenFile: (path: string, pin?: boolean) => void;
   onSelectPath: (path: string) => void;
   onRevealInTerminal?: (path: string) => void;
@@ -53,6 +55,7 @@ function EntryRowImpl(props: EntryRowProps) {
     tree,
     isSelected,
     isRenaming,
+    gitDecoration,
     onOpenFile,
     onSelectPath,
     onRevealInTerminal,
@@ -123,6 +126,20 @@ function EntryRowImpl(props: EntryRowProps) {
               <span className="size-4 shrink-0" />
             )}
             <span className="min-w-0 flex-1 truncate">{name}</span>
+            {gitDecoration && (
+              <span
+                className={cn(
+                  "ml-1 shrink-0 text-[10px] font-medium leading-none",
+                  gitDecoration === "U" || gitDecoration === "A"
+                    ? "text-emerald-400"
+                    : gitDecoration === "D"
+                      ? "text-red-400"
+                      : "text-amber-400",
+                )}
+              >
+                {gitDecoration}
+              </span>
+            )}
           </button>
         )}
       </ContextMenuTrigger>
