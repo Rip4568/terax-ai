@@ -226,16 +226,24 @@ html[data-chrome="borderless"] #settings-root {
   outline: none !important;
 }
 
-.cm-editor,
 .cm-scroller {
-  scrollbar-width: none !important;
-  -ms-overflow-style: none !important;
+  scrollbar-width: thin !important;
+  -ms-overflow-style: auto !important;
 }
-.cm-editor::-webkit-scrollbar,
 .cm-scroller::-webkit-scrollbar {
-  width: 0 !important;
-  height: 0 !important;
-  display: none !important;
+  width: 8px !important;
+  height: 8px !important;
+  display: block !important;
+}
+.cm-scroller::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--foreground) 25%, transparent);
+  border-radius: 4px;
+}
+.cm-scroller::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--foreground) 40%, transparent);
+}
+.cm-scroller::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 body {
