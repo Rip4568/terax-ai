@@ -3,13 +3,16 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useActivePorts } from "./useActivePorts";
 import { Input } from "@/components/ui/input";
 import {
   ArrowReloadHorizontalIcon,
   Globe02Icon,
   LinkSquare02Icon,
+  MultiplicationSignIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -81,6 +84,8 @@ export const PreviewAddressBar = forwardRef<PreviewAddressBarHandle, Props>(
       [],
     );
 
+    const { ports: activePorts, scanning: scanningPorts, refresh, killPort } = useActivePorts();
+
     const [notice, setNotice] = useState<string | null>(null);
     const [checkingPort, setCheckingPort] = useState<number | null>(null);
 
@@ -126,7 +131,7 @@ export const PreviewAddressBar = forwardRef<PreviewAddressBarHandle, Props>(
             strokeWidth={1.75}
           />
         </Button>
-        <DropdownMenu>
+        <DropdownMenu onOpenChange={(open) => { if (open) refresh(); }}>
           <DropdownMenuTrigger asChild>
             <Button
               type="button"
@@ -143,10 +148,53 @@ export const PreviewAddressBar = forwardRef<PreviewAddressBarHandle, Props>(
               <span className="hidden sm:inline">Ports</span>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align="start"
-            className="max-h-80 min-w-56 overflow-y-auto"
-          >
+          <DropdownMenuContent align="start" className="max-h-80 min-w-56 overflow-y-auto">
+            {scanningPorts && (
+              <div className="px-2 py-1.5 text-[10px] text-muted-foreground">
+                Scanning ports...
+              </div>
+            )}
+            {!scanningPorts && activePorts.length > 0 && (
+              <>
+                <div className="px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                  Active
+                </div>
+                {activePorts.map((port) => {
+                  const preset = PORT_PRESETS.find((p) => p.port === port);
+                  return (
+                    <DropdownMenuItem
+                      key={`active-${port}`}
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        void tryPort(port);
+                      }}
+                      className="pr-1"
+                    >
+                      <span className="flex-1">{preset?.label ?? `Port ${port}`}</span>
+                      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <span className="size-1.5 rounded-full bg-green-500" />
+                        {checkingPort === port ? "checking..." : `:${port}`}
+                      </span>
+                      <button
+                        type="button"
+                        title={`Kill process on :${port}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void killPort(port);
+                        }}
+                        className="ml-1 rounded p-0.5 text-muted-foreground/60 hover:bg-destructive/15 hover:text-destructive"
+                      >
+                        <HugeiconsIcon icon={MultiplicationSignIcon} size={11} strokeWidth={2} />
+                      </button>
+                    </DropdownMenuItem>
+                  );
+                })}
+                <DropdownMenuSeparator />
+              </>
+            )}
+            <div className="px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              Common
+            </div>
             {PORT_PRESETS.map((p) => (
               <DropdownMenuItem
                 key={p.port}
@@ -157,7 +205,7 @@ export const PreviewAddressBar = forwardRef<PreviewAddressBarHandle, Props>(
               >
                 <span className="flex-1">{p.label}</span>
                 <span className="text-xs text-muted-foreground">
-                  {checkingPort === p.port ? "checking…" : `:${p.port}`}
+                  {checkingPort === p.port ? "checking..." : `:${p.port}`}
                 </span>
               </DropdownMenuItem>
             ))}

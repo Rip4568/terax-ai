@@ -159,6 +159,9 @@ export function useTabs(initial?: Partial<TerminalTab>) {
     tabsRef.current = tabs;
   }, [tabs]);
 
+  const activeIdRef = useRef(activeId);
+  activeIdRef.current = activeId;
+
   const newTab = useCallback((cwd?: string) => {
     const tabId = nextIdRef.current++;
     const leafId = nextIdRef.current++;
@@ -367,6 +370,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
   );
 
   const closeAiDiffTab = useCallback((approvalId: string) => {
+    let nextActiveId: number | null = null;
     setTabs((curr) => {
       const target = curr.find(
         (t) => t.kind === "ai-diff" && t.approvalId === approvalId,
@@ -381,11 +385,12 @@ export function useTabs(initial?: Partial<TerminalTab>) {
       }
       const idx = curr.findIndex((t) => t.id === target.id);
       const next = curr.filter((t) => t.id !== target.id);
-      setActiveId((active) =>
-        target.id === active ? next[Math.max(0, idx - 1)].id : active,
-      );
+      if (target.id === activeIdRef.current) {
+        nextActiveId = next[Math.max(0, idx - 1)].id;
+      }
       return next;
     });
+    if (nextActiveId !== null) setActiveId(nextActiveId);
   }, []);
 
   const newPreviewTab = useCallback((url: string) => {
@@ -562,21 +567,37 @@ export function useTabs(initial?: Partial<TerminalTab>) {
     [],
   );
 
+  const reorderTabs = useCallback((fromId: number, toId: number) => {
+    if (fromId === toId) return;
+    setTabs((curr) => {
+      const from = curr.findIndex((t) => t.id === fromId);
+      const to = curr.findIndex((t) => t.id === toId);
+      if (from === -1 || to === -1) return curr;
+      const next = [...curr];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+  }, []);
+
   const closeTab = useCallback((id: number) => {
     let toDispose: number[] = [];
+    let nextActiveId: number | null = null;
     setTabs((curr) => {
       if (curr.length <= 1) return curr;
       const idx = curr.findIndex((t) => t.id === id);
+      if (idx === -1) return curr;
       const target = curr[idx];
       if (target && target.kind === "terminal") {
         toDispose = leafIds(target.paneTree);
       }
       const next = curr.filter((t) => t.id !== id);
-      setActiveId((active) =>
-        id === active ? next[Math.max(0, idx - 1)].id : active,
-      );
+      if (id === activeIdRef.current) {
+        nextActiveId = next[Math.max(0, idx - 1)].id;
+      }
       return next;
     });
+    if (nextActiveId !== null) setActiveId(nextActiveId);
     for (const lid of toDispose) disposeSession(lid);
   }, []);
 
@@ -712,6 +733,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
 
   const closePaneByLeaf = useCallback((leafId: number): void => {
     let didRemove = false;
+    let nextActiveId: number | null = null;
     setTabs((curr) => {
       const tab = curr.find(
         (t) => t.kind === "terminal" && hasLeaf(t.paneTree, leafId),
@@ -722,9 +744,9 @@ export function useTabs(initial?: Partial<TerminalTab>) {
         if (curr.length <= 1) return curr;
         const idx = curr.findIndex((x) => x.id === tab.id);
         const next = curr.filter((x) => x.id !== tab.id);
-        setActiveId((active) =>
-          active === tab.id ? next[Math.max(0, idx - 1)].id : active,
-        );
+        if (activeIdRef.current === tab.id) {
+          nextActiveId = next[Math.max(0, idx - 1)].id;
+        }
         didRemove = true;
         return next;
       }
@@ -741,12 +763,14 @@ export function useTabs(initial?: Partial<TerminalTab>) {
           : x,
       );
     });
+    if (nextActiveId !== null) setActiveId(nextActiveId);
     if (didRemove) disposeSession(leafId);
   }, []);
 
   const closeActivePane = useCallback((tabId: number): boolean => {
     let closedTab = false;
     let removedLeaf: number | null = null;
+    let nextActiveId: number | null = null;
     setTabs((curr) => {
       const t = curr.find((x) => x.id === tabId);
       if (!t || t.kind !== "terminal") return curr;
@@ -756,9 +780,9 @@ export function useTabs(initial?: Partial<TerminalTab>) {
         if (curr.length <= 1) return curr;
         const idx = curr.findIndex((x) => x.id === tabId);
         const next = curr.filter((x) => x.id !== tabId);
-        setActiveId((active) =>
-          active === tabId ? next[Math.max(0, idx - 1)].id : active,
-        );
+        if (activeIdRef.current === tabId) {
+          nextActiveId = next[Math.max(0, idx - 1)].id;
+        }
         closedTab = true;
         removedLeaf = target;
         return next;
@@ -774,6 +798,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
           : x,
       );
     });
+    if (nextActiveId !== null) setActiveId(nextActiveId);
     if (removedLeaf !== null) disposeSession(removedLeaf);
     return closedTab;
   }, []);
@@ -818,6 +843,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
     openCommitFileDiffTab,
     setAiDiffStatus,
     closeAiDiffTab,
+    reorderTabs,
     closeTab,
     updateTab,
     selectByIndex,

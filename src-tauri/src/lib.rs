@@ -232,6 +232,8 @@ pub fn run() {
             net::lm_ping,
             net::ai_http_request,
             net::ai_http_stream,
+            net::net_scan_ports,
+            net::net_kill_port,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

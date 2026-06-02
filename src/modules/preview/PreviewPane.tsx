@@ -1,4 +1,4 @@
-import { Alert02Icon, Globe02Icon } from "@hugeicons/core-free-icons";
+import { Alert02Icon, Cancel01Icon, Globe02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   forwardRef,
@@ -35,6 +35,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, Props>(
     // contentWindow.location.reload() throws on cross-origin frames).
     const [nonce, setNonce] = useState(0);
     const [loaded, setLoaded] = useState(visible);
+    const [hintDismissed, setHintDismissed] = useState(false);
     const addressRef = useRef<PreviewAddressBarHandle>(null);
 
     useEffect(() => {
@@ -45,6 +46,10 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, Props>(
       const t = setTimeout(() => setLoaded(false), SUSPEND_AFTER_MS);
       return () => clearTimeout(t);
     }, [visible]);
+
+    useEffect(() => {
+      setHintDismissed(false);
+    }, [url]);
 
     useImperativeHandle(
       ref,
@@ -59,7 +64,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, Props>(
       [url],
     );
 
-    const showXfoHint = url ? !isLocalUrl(url) : false;
+    const showXfoHint = !!url;
 
     return (
       <div
@@ -75,7 +80,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, Props>(
           onSubmit={onUrlChange}
           onReload={() => setNonce((n) => n + 1)}
         />
-        {showXfoHint ? (
+        {showXfoHint && !hintDismissed ? (
           <div className="flex h-7 shrink-0 items-center gap-1.5 border-b border-border/60 bg-amber-500/8 px-3 text-[11px] text-amber-600 dark:text-amber-400">
             <HugeiconsIcon
               icon={Alert02Icon}
@@ -84,9 +89,18 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, Props>(
               className="shrink-0"
             />
             <span className="truncate">
-              Many public sites refuse to embed (X-Frame-Options). If the page
-              is blank, open it externally.
+              {isLocalUrl(url)
+                ? "If blank, your server sends X-Frame-Options. Disable it in your framework security settings (e.g. AdonisJS Shield, Express Helmet)."
+                : "Many public sites refuse to embed (X-Frame-Options). If the page is blank, open it externally."}
             </span>
+            <button
+              type="button"
+              onClick={() => setHintDismissed(true)}
+              className="ml-auto shrink-0 text-amber-600/70 hover:text-amber-600 dark:text-amber-400/70 dark:hover:text-amber-400"
+              aria-label="Dismiss"
+            >
+              <HugeiconsIcon icon={Cancel01Icon} size={10} strokeWidth={2} />
+            </button>
           </div>
         ) : null}
         <div

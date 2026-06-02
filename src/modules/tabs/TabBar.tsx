@@ -46,6 +46,7 @@ type Props = {
   onPin: (id: number) => void;
   /** Set a terminal tab's custom label; empty string resets to default. */
   onRename: (id: number, title: string) => void;
+  onReorder: (fromId: number, toId: number) => void;
   compact?: boolean;
 };
 
@@ -61,9 +62,13 @@ export function TabBar({
   onClose,
   onPin,
   onRename,
+  onReorder,
   compact,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [draggingId, setDraggingId] = useState<number | null>(null);
+  const [dragOverId, setDragOverId] = useState<number | null>(null);
+  const dragIdRef = useRef<number | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
 
   // Horizontal wheel scroll without holding shift.
@@ -87,6 +92,19 @@ export function TabBar({
     const active = el.querySelector<HTMLElement>(`[data-tab-id="${activeId}"]`);
     active?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }, [activeId, tabs.length]);
+
+  // Clean up drag state when the mouse is released outside any tab.
+  useEffect(() => {
+    const handleMouseUp = () => {
+      if (dragIdRef.current !== null) {
+        dragIdRef.current = null;
+        setDraggingId(null);
+        setDragOverId(null);
+      }
+    };
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => window.removeEventListener("mouseup", handleMouseUp);
+  }, []);
 
   return (
     <div
@@ -112,6 +130,26 @@ export function TabBar({
                   <div
                     key={t.id}
                     data-tab-id={t.id}
+                    onMouseDown={(e) => {
+                      if (e.button !== 0) return;
+                      dragIdRef.current = t.id;
+                    }}
+                    onMouseEnter={() => {
+                      if (dragIdRef.current !== null && dragIdRef.current !== t.id) {
+                        setDraggingId(dragIdRef.current);
+                        setDragOverId(t.id);
+                      }
+                    }}
+                    onMouseUp={(e) => {
+                      if (e.button !== 0) return;
+                      const from = dragIdRef.current;
+                      dragIdRef.current = null;
+                      setDraggingId(null);
+                      setDragOverId(null);
+                      if (from !== null && from !== t.id) {
+                        onReorder(from, t.id);
+                      }
+                    }}
                     className={cn(
                       "flex h-7 shrink-0 items-center gap-1.5 rounded-md bg-accent text-xs text-foreground",
                       compact ? "px-1.5" : "px-2",
@@ -144,10 +182,28 @@ export function TabBar({
                     }
                   }}
                   onMouseDown={(e) => {
-                    if (e.button === 1) e.preventDefault();
+                    if (e.button === 1) { e.preventDefault(); return; }
+                    if (e.button !== 0) return;
+                    dragIdRef.current = t.id;
+                  }}
+                  onMouseEnter={() => {
+                    if (dragIdRef.current !== null && dragIdRef.current !== t.id) {
+                      setDraggingId(dragIdRef.current);
+                      setDragOverId(t.id);
+                    }
+                  }}
+                  onMouseUp={(e) => {
+                    if (e.button !== 0) return;
+                    const from = dragIdRef.current;
+                    dragIdRef.current = null;
+                    setDraggingId(null);
+                    setDragOverId(null);
+                    if (from !== null && from !== t.id) {
+                      onReorder(from, t.id);
+                    }
                   }}
                   className={cn(
-                    "group h-7 shrink-0 gap-1.5 rounded-md text-xs transition-colors hover:text-foreground/80 justify-between",
+                    "group h-7 shrink-0 gap-1.5 rounded-md text-xs transition-colors hover:text-foreground/80 justify-between cursor-grab",
                     isActive
                       ? "bg-accent text-foreground"
                       : "text-muted-foreground",
@@ -156,6 +212,8 @@ export function TabBar({
                       : tabs.length === 1
                         ? "px-2!"
                         : "ps-2! pe-1!",
+                    draggingId === t.id && "opacity-40 cursor-grabbing",
+                    dragOverId === t.id && draggingId !== null && "ring-1 ring-inset ring-primary/50",
                   )}
                 >
                   <span
