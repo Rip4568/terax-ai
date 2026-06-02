@@ -24,6 +24,7 @@ import {
   vimCompartment,
 } from "./lib/extensions";
 import { initVimGlobals, vimHandlersExtension } from "./lib/vim";
+import { pathLinkExtension } from "./lib/pathLink";
 
 initVimGlobals();
 import { resolveLanguage } from "./lib/languageResolver";
@@ -52,6 +53,7 @@ type Props = {
   onDirtyChange?: (dirty: boolean) => void;
   onSaved?: () => void;
   onClose?: () => void;
+  onOpenFile?: (path: string, pin: boolean) => void;
 };
 
 function formatBytes(n: number): string {
@@ -61,7 +63,7 @@ function formatBytes(n: number): string {
 }
 
 export const EditorPane = forwardRef<EditorPaneHandle, Props>(
-  function EditorPane({ path, onDirtyChange, onSaved, onClose }, ref) {
+  function EditorPane({ path, onDirtyChange, onSaved, onClose, onOpenFile }, ref) {
     const { doc, onChange, save, reload } = useDocument({ path, onDirtyChange });
     const reloadRef = useRef(reload);
     reloadRef.current = reload;
@@ -112,6 +114,9 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
 
     const pathRef = useRef(path);
     pathRef.current = path;
+
+    const openFileRef = useRef(onOpenFile);
+    openFileRef.current = onOpenFile;
 
     const extensions = useMemo(
       () => [
@@ -174,6 +179,12 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
             },
           },
         ]),
+        ...(openFileRef.current
+          ? [pathLinkExtension(
+              (p, pin) => openFileRef.current?.(p, pin),
+              () => pathRef.current ?? "",
+            )]
+          : []),
       ],
       [],
     );
@@ -303,7 +314,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     }
 
     return (
-      <div className="flex h-full min-h-0 flex-col">
+      <div className="flex h-full min-h-0 flex-col overflow-hidden">
         <CodeMirror
           ref={cmRef}
           value={doc.content}
@@ -311,7 +322,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
           theme={themeExt}
           extensions={extensions}
           height="100%"
-          className="flex-1 min-h-0 overflow-hidden"
+          className="flex-1 min-h-0"
           basicSetup={{
             lineNumbers: true,
             highlightActiveLineGutter: true,

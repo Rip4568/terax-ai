@@ -35,7 +35,8 @@ type Props = {
 
 function dirname(path: string): string {
   const i = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
-  if (i <= 0) return "/";
+  if (i < 0) return ".";
+  if (i === 0) return "/";
   return path.slice(0, i);
 }
 
@@ -185,6 +186,7 @@ function CurrentSegmentDropdown({
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    setChildren(null);
     setError(null);
     try {
       const dirs = await invoke<string[]>("list_subdirs", {

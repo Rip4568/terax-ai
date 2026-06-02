@@ -200,6 +200,7 @@ export default function App() {
     openGitDiffTab,
     openCommitHistoryTab,
     openCommitFileDiffTab,
+    reorderTabs,
     closeTab,
     updateTab,
     selectByIndex,
@@ -1467,6 +1468,7 @@ export default function App() {
           registerHandle={registerEditorHandle}
           onDirtyChange={handleEditorDirty}
           onCloseTab={disposeTab}
+          onOpenFile={openFileTab}
         />
       </div>
       <div
@@ -1549,6 +1551,7 @@ export default function App() {
             onClose={handleClose}
             onPin={pinTab}
             onRename={handleRenameTab}
+            onReorder={reorderTabs}
             onToggleSidebar={toggleSidebar}
             onSplit={splitActivePaneInActiveTab}
             canSplit={

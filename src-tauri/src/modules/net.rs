@@ -434,6 +434,118 @@ pub async fn ai_http_stream(
     Ok(())
 }
 
+const SCAN_TIMEOUT_MS: u64 = 50;
+const CHUNK_SIZE: usize = 200;
+
+#[tauri::command]
+pub async fn net_scan_ports(start: u16, end: u16) -> Result<Vec<u16>, String> {
+    if start == 0 {
+        return Err("start must be >= 1".into());
+    }
+    let end = end.min(start.saturating_add(9_999));
+    let ports: Vec<u16> = (start..=end).collect();
+    let mut open_ports: Vec<u16> = Vec::new();
+    for chunk in ports.chunks(CHUNK_SIZE) {
+        let handles: Vec<_> = chunk
+            .iter()
+            .copied()
+            .map(|port| {
+                tokio::spawn(async move {
+                    let ipv4 = std::net::SocketAddr::new(
+                        std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST),
+                        port,
+                    );
+                    let ipv6 = std::net::SocketAddr::new(
+                        std::net::IpAddr::V6(std::net::Ipv6Addr::LOCALHOST),
+                        port,
+                    );
+                    let result = tokio::time::timeout(
+                        tokio::time::Duration::from_millis(SCAN_TIMEOUT_MS),
+                        async {
+                            let (r4, r6) = tokio::join!(
+                                tokio::net::TcpStream::connect(ipv4),
+                                tokio::net::TcpStream::connect(ipv6),
+                            );
+                            r4.is_ok() || r6.is_ok()
+                        },
+                    )
+                    .await;
+                    match result {
+                        Ok(true) => Some(port),
+                        _ => None,
+                    }
+                })
+            })
+            .collect();
+        for handle in handles {
+            if let Ok(Some(port)) = handle.await {
+                open_ports.push(port);
+            }
+        }
+    }
+    open_ports.sort_unstable();
+    Ok(open_ports)
+}
+
+#[tauri::command]
+pub async fn net_kill_port(port: u16) -> Result<(), String> {
+    #[cfg(unix)]
+    {
+        use std::process::Command;
+        // Find PIDs listening on the port
+        let output = Command::new("sh")
+            .args(["-c", &format!("lsof -ti tcp:{}", port)])
+            .output()
+            .map_err(|e| e.to_string())?;
+        let pids_raw = String::from_utf8_lossy(&output.stdout);
+        let pids: Vec<u32> = pids_raw
+            .split_whitespace()
+            .filter_map(|s| s.parse().ok())
+            .collect();
+        if pids.is_empty() {
+            return Ok(());
+        }
+        // SIGTERM first
+        for &pid in &pids {
+            let _ = Command::new("kill").args(["-15", &pid.to_string()]).status();
+        }
+        // Wait up to 2s for graceful shutdown
+        tokio::time::sleep(tokio::time::Duration::from_millis(1500)).await;
+        // SIGKILL any survivors
+        for &pid in &pids {
+            let output = Command::new("sh")
+                .args(["-c", &format!("kill -0 {}", pid)])
+                .output();
+            if output.map(|o| o.status.success()).unwrap_or(false) {
+                let _ = Command::new("kill").args(["-9", &pid.to_string()]).status();
+            }
+        }
+        Ok(())
+    }
+    #[cfg(windows)]
+    {
+        use std::process::Command;
+        let output = Command::new("cmd")
+            .args(["/c", &format!("netstat -ano | findstr :{}", port)])
+            .output()
+            .map_err(|e| e.to_string())?;
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let pids: Vec<u32> = stdout
+            .lines()
+            .filter_map(|line| line.split_whitespace().last()?.parse().ok())
+            .collect();
+        if pids.is_empty() {
+            return Ok(());
+        }
+        for &pid in &pids {
+            let _ = Command::new("taskkill")
+                .args(["/PID", &pid.to_string(), "/F"])
+                .status();
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
